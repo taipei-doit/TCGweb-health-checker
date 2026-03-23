@@ -401,6 +401,21 @@ def stop_vm():
         return jsonify({"success": False, "error": str(e)}), 500
 
 
+@app.route("/api/vm/progress", methods=["GET"])
+def get_vm_progress():
+    """取得爬蟲執行進度"""
+    try:
+        doc = db.collection("crawler_progress").document("current").get()
+        if doc.exists:
+            data = doc.to_dict()
+            if data.get("updated_at"):
+                data["updated_at"] = data["updated_at"].strftime("%Y-%m-%d %H:%M:%S")
+            return jsonify({"success": True, "data": data})
+        return jsonify({"success": True, "data": None})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 @app.route("/api/vm/events", methods=["GET"])
 def get_vm_events():
     """取得最近的 VM 事件紀錄"""

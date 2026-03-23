@@ -403,6 +403,18 @@
                         </div>
                     </div>
                     <div class="vm-info" id="vm-name-display">VM: -</div>
+                    <!-- Progress bar -->
+                    <div id="progress-section" style="display:none; margin: 20px auto; max-width: 500px;">
+                        <div style="display:flex; justify-content:space-between; font-size:14px; margin-bottom:6px;">
+                            <span id="progress-label">進度</span>
+                            <span id="progress-pct">0%</span>
+                        </div>
+                        <div style="background:#e9ecef; border-radius:8px; height:24px; overflow:hidden;">
+                            <div id="progress-bar" style="background:linear-gradient(90deg,#28a745,#20c997); height:100%; border-radius:8px; transition:width 0.5s; width:0%;"></div>
+                        </div>
+                        <div class="vm-info" id="progress-detail" style="margin-top:8px;"></div>
+                    </div>
+
                     <div class="vm-actions">
                         <button class="btn btn-success btn-lg" id="btn-start-vm" onclick="startVM()" disabled>
                             啟動爬蟲
@@ -631,6 +643,7 @@
 
     // ========== VM Control ==========
     let vmRefreshTimer = null;
+    let progressTimer = null;
 
     async function loadVMStatus() {
         try {
@@ -662,6 +675,17 @@
 
             btnStart.disabled = isRunning;
             btnStop.disabled = !isRunning;
+
+            // Auto-poll progress when running
+            if (isRunning) {
+                loadProgress();
+                if (!progressTimer) {
+                    progressTimer = setInterval(loadProgress, 10 * 60 * 1000); // 10 min
+                }
+            } else {
+                if (progressTimer) { clearInterval(progressTimer); progressTimer = null; }
+                loadProgress(); // show final state
+            }
         } catch(e) {
             document.getElementById('vm-status-display').innerHTML =
                 `<div class="vm-status-indicator loading"><span class="dot"></span> 連線錯誤</div>`;
@@ -722,6 +746,42 @@
             document.getElementById('events-table-body').innerHTML =
                 '<tr><td colspan="4" class="empty-state">載入失敗</td></tr>';
         }
+    }
+
+    // ========== Progress ==========
+    async function loadProgress() {
+        try {
+            const res = await fetch('/api/vm/progress');
+            const json = await res.json();
+            const section = document.getElementById('progress-section');
+
+            if (!json.success || !json.data) {
+                section.style.display = 'none';
+                return;
+            }
+
+            const d = json.data;
+            section.style.display = 'block';
+
+            const pct = d.total > 0 ? Math.round((d.processed / d.total) * 100) : 0;
+            document.getElementById('progress-bar').style.width = pct + '%';
+            document.getElementById('progress-pct').textContent = pct + '%';
+            document.getElementById('progress-label').textContent =
+                d.status === 'completed' ? '已完成' :
+                d.status === 'error' ? '執行異常' :
+                '執行中...';
+
+            const statusIcon = d.status === 'completed' ? '✅' : d.status === 'error' ? '❌' : '⏳';
+            document.getElementById('progress-detail').textContent =
+                `${statusIcon} ${d.processed} / ${d.total} 個網站 (成功: ${d.successful}, 失敗: ${d.failed}) · ${d.month} · 更新: ${d.updated_at || '-'}`;
+
+            // Change bar color based on status
+            const bar = document.getElementById('progress-bar');
+            if (d.status === 'completed') bar.style.background = 'linear-gradient(90deg, #28a745, #20c997)';
+            else if (d.status === 'error') bar.style.background = 'linear-gradient(90deg, #dc3545, #e74c3c)';
+            else bar.style.background = 'linear-gradient(90deg, #1a73e8, #4dabf7)';
+
+        } catch(e) { /* ignore */ }
     }
 
     // ========== Reports ==========

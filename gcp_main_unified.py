@@ -244,6 +244,28 @@ async def _async_crawl_worker(site_config: dict) -> dict | None:
 
 
 # ---------------------------------------------------------------------------
+# Progress tracking (Firestore)
+# ---------------------------------------------------------------------------
+
+def update_progress(total: int, successful: int, failed: int, status: str = "running"):
+    """Write crawl progress to Firestore for the management UI."""
+    try:
+        from google.cloud import firestore as _fs
+        db = _fs.Client()
+        db.collection("crawler_progress").document("current").set({
+            "total": total,
+            "successful": successful,
+            "failed": failed,
+            "processed": successful + failed,
+            "status": status,  # running, completed, error
+            "updated_at": _fs.SERVER_TIMESTAMP,
+            "month": datetime.now().strftime("%Y-%m"),
+        })
+    except Exception:
+        pass  # Non-critical, don't crash the crawler
+
+
+# ---------------------------------------------------------------------------
 # Pool mode helpers (from gcp_main_mpfast.py)
 # ---------------------------------------------------------------------------
 
@@ -273,9 +295,12 @@ def run_pool_mode(
         f"(maxtasksperchild=1)"
     )
     start_time = time.time()
+    num_total = len(websites_to_process)
     successful_sites = 0
     failed_sites = 0
     crawl_success = True
+
+    update_progress(num_total, 0, 0, "running")
 
     try:
         with multiprocessing.Pool(
@@ -297,9 +322,14 @@ def run_pool_mode(
                 else:
                     failed_sites += 1
 
+                update_progress(num_total, successful_sites, failed_sites, "running")
+
     except Exception as e:
         print(f"\n[Pool] Fatal error: {e}")
         crawl_success = False
+
+    status = "completed" if crawl_success else "error"
+    update_progress(num_total, successful_sites, failed_sites, status)
 
     total_duration = time.time() - start_time
     print(
@@ -439,6 +469,8 @@ def run_queue_mode(
     processed_count = 0
     crawl_success = True
 
+    update_progress(num_total_tasks, 0, 0, "running")
+
     try:
         while processed_count < num_total_tasks:
             try:
@@ -461,6 +493,7 @@ def run_queue_mode(
                 elif isinstance(result, tuple) and result[0] == "FAILED":
                     failed_sites += 1
                     processed_count += 1
+                    update_progress(num_total_tasks, successful_sites, failed_sites, "running")
                     print(
                         f"[Progress] {processed_count}/{num_total_tasks} "
                         f"(ok={successful_sites}, fail={failed_sites})"
@@ -482,6 +515,7 @@ def run_queue_mode(
                         failed_sites += 1
 
                     processed_count += 1
+                    update_progress(num_total_tasks, successful_sites, failed_sites, "running")
                     print(
                         f"[Progress] {processed_count}/{num_total_tasks} "
                         f"(ok={successful_sites}, fail={failed_sites})"
@@ -506,6 +540,9 @@ def run_queue_mode(
             if p.is_alive():
                 p.terminate()
                 p.join()
+
+    status = "completed" if crawl_success else "error"
+    update_progress(num_total_tasks, successful_sites, failed_sites, status)
 
     total_duration = time.time() - start_time
     print(
