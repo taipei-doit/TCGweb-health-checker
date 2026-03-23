@@ -57,7 +57,7 @@ gcloud run deploy $SERVICE_NAME \
     --cpu 1 \
     --min-instances 0 \
     --max-instances 2 \
-    --set-env-vars="GOOGLE_CLOUD_PROJECT=$PROJECT_ID,CRAWLER_VM_NAME=$VM_NAME,CRAWLER_VM_ZONE=$VM_ZONE"
+    --set-env-vars="GOOGLE_CLOUD_PROJECT=$PROJECT_ID,CRAWLER_VM_NAME=$VM_NAME,CRAWLER_VM_ZONE=$VM_ZONE,GCS_REPORT_BUCKET=doit-dic-itteam-crawler-reports"
 
 # 取得服務 URL
 SERVICE_URL=$(gcloud run services describe $SERVICE_NAME \

@@ -17,6 +17,12 @@ try:
 except ImportError:
     HAS_COMPUTE = False
 
+try:
+    from google.cloud import storage as gcs_storage
+    HAS_GCS = True
+except ImportError:
+    HAS_GCS = False
+
 app = Flask(__name__)
 db = firestore.Client()
 
@@ -28,6 +34,7 @@ WEBSITES_COLLECTION = "websites"
 DEFAULT_VM_NAME = os.environ.get("CRAWLER_VM_NAME", "crawler-webcheck")
 DEFAULT_ZONE = os.environ.get("CRAWLER_VM_ZONE", "asia-east1-c")
 GCP_PROJECT = os.environ.get("GOOGLE_CLOUD_PROJECT", "")
+GCS_BUCKET = os.environ.get("GCS_REPORT_BUCKET", "doit-dic-itteam-crawler-reports")
 
 
 # ============================================================
@@ -409,6 +416,93 @@ def get_vm_events():
                 data["timestamp"] = data["timestamp"].strftime("%Y-%m-%d %H:%M:%S")
             events.append(data)
         return jsonify({"success": True, "data": events})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+# ============================================================
+#  歷史報告 API (GCS)
+# ============================================================
+
+@app.route("/api/reports", methods=["GET"])
+def get_reports():
+    """列出所有月份的報告"""
+    if not HAS_GCS:
+        return jsonify({"success": False, "error": "google-cloud-storage 未安裝"}), 500
+
+    try:
+        client = gcs_storage.Client()
+        bucket = client.bucket(GCS_BUCKET)
+
+        # 列出所有 Excel 報告（頂層目錄按年月分）
+        months = set()
+        reports = []
+
+        blobs = bucket.list_blobs()
+        for blob in blobs:
+            parts = blob.name.split("/")
+            if len(parts) >= 2:
+                month = parts[0]  # e.g. "2026-03"
+                months.add(month)
+
+                # 只列出 Excel 和頂層 JSON/CSV
+                filename = parts[-1]
+                if filename.endswith((".xlsx", ".json", ".csv", ".txt")):
+                    reports.append({
+                        "month": month,
+                        "path": blob.name,
+                        "filename": filename,
+                        "size_mb": round(blob.size / 1024 / 1024, 2) if blob.size else 0,
+                        "updated": blob.updated.strftime("%Y-%m-%d %H:%M") if blob.updated else "",
+                        "is_excel": filename.endswith(".xlsx"),
+                        "subfolder": "/".join(parts[1:-1]) if len(parts) > 2 else "",
+                    })
+
+        # 按月份倒序排列
+        sorted_months = sorted(months, reverse=True)
+
+        return jsonify({
+            "success": True,
+            "months": sorted_months,
+            "reports": reports,
+        })
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/reports/download/<path:blob_path>", methods=["GET"])
+def download_report(blob_path):
+    """下載指定的報告檔案"""
+    if not HAS_GCS:
+        return jsonify({"success": False, "error": "google-cloud-storage 未安裝"}), 500
+
+    try:
+        client = gcs_storage.Client()
+        bucket = client.bucket(GCS_BUCKET)
+        blob = bucket.blob(blob_path)
+
+        if not blob.exists():
+            return jsonify({"success": False, "error": "檔案不存在"}), 404
+
+        content = blob.download_as_bytes()
+        filename = blob_path.split("/")[-1]
+
+        # 判斷 MIME type
+        if filename.endswith(".xlsx"):
+            mimetype = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        elif filename.endswith(".json"):
+            mimetype = "application/json"
+        elif filename.endswith(".csv"):
+            mimetype = "text/csv"
+        else:
+            mimetype = "application/octet-stream"
+
+        from flask import Response
+        return Response(
+            content,
+            mimetype=mimetype,
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 

@@ -237,6 +237,30 @@
         }
         .search-box:focus { border-color: #1a73e8; }
 
+        /* Report cards */
+        .report-month { margin-bottom: 20px; }
+        .report-month h3 { font-size: 16px; color: #333; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 2px solid #e9ecef; }
+        .report-file {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 10px 16px; border-radius: 8px; margin-bottom: 6px;
+            background: #f8f9fa; transition: background 0.2s;
+        }
+        .report-file:hover { background: #e8f0fe; }
+        .report-file .file-info { display: flex; align-items: center; gap: 10px; }
+        .report-file .file-icon { font-size: 20px; }
+        .report-file .file-name { font-weight: 500; font-size: 14px; }
+        .report-file .file-meta { font-size: 12px; color: #999; }
+        .report-file.excel { border-left: 3px solid #28a745; }
+        .report-file.json { border-left: 3px solid #ffc107; }
+        .report-file.csv { border-left: 3px solid #17a2b8; }
+        .month-filter { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+        .month-chip {
+            padding: 6px 16px; border-radius: 20px; font-size: 13px; cursor: pointer;
+            border: 1px solid #ddd; background: white; transition: all 0.2s;
+        }
+        .month-chip:hover { border-color: #1a73e8; }
+        .month-chip.active { background: #1a73e8; color: white; border-color: #1a73e8; }
+
         @media (max-width: 768px) {
             .container { padding: 12px; }
             .form-row { flex-direction: column; }
@@ -256,6 +280,7 @@
             <div class="tab active" onclick="switchTab('recipients')">Email 收件人</div>
             <div class="tab" onclick="switchTab('websites')">網站清單</div>
             <div class="tab" onclick="switchTab('crawler')">爬蟲控制</div>
+            <div class="tab" onclick="switchTab('reports')">歷史報告</div>
         </div>
 
         <!-- ==================== Email 收件人 Tab ==================== -->
@@ -408,6 +433,20 @@
                             <tr><td colspan="4" class="empty-state">載入中...</td></tr>
                         </tbody>
                     </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+        <!-- ==================== 歷史報告 Tab ==================== -->
+        <div id="tab-reports" class="tab-content">
+            <div class="card">
+                <div class="toolbar">
+                    <h2>歷史報告 <span class="badge" id="rpt-count">0</span></h2>
+                </div>
+                <div class="month-filter" id="month-filter"></div>
+                <div id="reports-content">
+                    <div class="empty-state"><div class="icon">📊</div>載入中...</div>
                 </div>
             </div>
         </div>
@@ -685,6 +724,111 @@
         }
     }
 
+    // ========== Reports ==========
+    let allReports = [];
+    let allMonths = [];
+    let selectedMonth = 'all';
+
+    async function loadReports() {
+        try {
+            const res = await fetch('/api/reports');
+            const json = await res.json();
+            if (!json.success) { document.getElementById('reports-content').innerHTML = '<div class="empty-state">載入失敗: ' + (json.error||'') + '</div>'; return; }
+
+            allReports = json.reports;
+            allMonths = json.months;
+            document.getElementById('rpt-count').textContent = allMonths.length + ' 個月';
+
+            // Render month filter
+            const filterHtml = ['<span class="month-chip active" onclick="filterMonth(\'all\', this)">全部</span>']
+                .concat(allMonths.map(m => `<span class="month-chip" onclick="filterMonth('${m}', this)">${m}</span>`))
+                .join('');
+            document.getElementById('month-filter').innerHTML = filterHtml;
+
+            renderReports(allReports, allMonths);
+        } catch(e) {
+            document.getElementById('reports-content').innerHTML = '<div class="empty-state">載入失敗</div>';
+        }
+    }
+
+    function filterMonth(month, el) {
+        selectedMonth = month;
+        document.querySelectorAll('.month-chip').forEach(c => c.classList.remove('active'));
+        if (el) el.classList.add('active');
+
+        if (month === 'all') {
+            renderReports(allReports, allMonths);
+        } else {
+            renderReports(allReports.filter(r => r.month === month), [month]);
+        }
+    }
+
+    function renderReports(reports, months) {
+        const content = document.getElementById('reports-content');
+        if (!reports.length) {
+            content.innerHTML = '<div class="empty-state"><div class="icon">📊</div>尚無報告</div>';
+            return;
+        }
+
+        let html = '';
+        for (const month of months) {
+            const monthReports = reports.filter(r => r.month === month);
+            if (!monthReports.length) continue;
+
+            // Excel files first, then others
+            const excels = monthReports.filter(r => r.is_excel);
+            const others = monthReports.filter(r => !r.is_excel && !r.subfolder);
+            const siteFiles = monthReports.filter(r => r.subfolder);
+
+            html += `<div class="report-month"><h3>${month}</h3>`;
+
+            for (const r of excels) {
+                html += reportFileHtml(r, '📗', 'excel');
+            }
+            for (const r of others) {
+                const icon = r.filename.endsWith('.json') ? '📋' : r.filename.endsWith('.csv') ? '📄' : '📝';
+                const cls = r.filename.endsWith('.json') ? 'json' : r.filename.endsWith('.csv') ? 'csv' : '';
+                html += reportFileHtml(r, icon, cls);
+            }
+
+            if (siteFiles.length) {
+                // Group by subfolder
+                const folders = {};
+                for (const r of siteFiles) {
+                    if (!folders[r.subfolder]) folders[r.subfolder] = [];
+                    folders[r.subfolder].push(r);
+                }
+                const folderCount = Object.keys(folders).length;
+                html += `<details style="margin-top:8px"><summary style="cursor:pointer;color:#666;font-size:13px">個別網站資料 (${folderCount} 個網站，${siteFiles.length} 個檔案)</summary><div style="margin-top:8px">`;
+                for (const [folder, files] of Object.entries(folders)) {
+                    const folderName = folder.replace('sites/', '');
+                    html += `<div style="font-size:13px;color:#666;margin:8px 0 4px;font-weight:500">${esc(folderName)}</div>`;
+                    for (const r of files) {
+                        const icon = r.filename.endsWith('.json') ? '📋' : r.filename.endsWith('.csv') ? '📄' : '📝';
+                        html += reportFileHtml(r, icon, '');
+                    }
+                }
+                html += '</div></details>';
+            }
+
+            html += '</div>';
+        }
+        content.innerHTML = html;
+    }
+
+    function reportFileHtml(r, icon, cls) {
+        return `<div class="report-file ${cls}">
+            <div class="file-info">
+                <span class="file-icon">${icon}</span>
+                <div>
+                    <div class="file-name">${esc(r.filename)}</div>
+                    <div class="file-meta">${r.size_mb} MB · ${r.updated}</div>
+                </div>
+            </div>
+            <a href="/api/reports/download/${encodeURIComponent(r.path)}" class="btn btn-outline btn-sm">下載</a>
+        </div>`;
+    }
+
     // ========== Utils ==========
     function esc(s) {
         if (!s) return '';
@@ -698,6 +842,7 @@
     loadWebsites();
     loadVMStatus();
     loadEvents();
+    loadReports();
     </script>
 </body>
 </html>

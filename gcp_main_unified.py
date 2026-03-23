@@ -572,6 +572,56 @@ def pack_and_send_email(excel_report_path: str):
 
 
 # ---------------------------------------------------------------------------
+# GCS upload
+# ---------------------------------------------------------------------------
+
+GCS_BUCKET = "doit-dic-itteam-crawler-reports"
+
+
+def upload_reports_to_gcs(excel_path: str, assets_dir: str = "assets"):
+    """Upload Excel report and per-site JSON/CSV files to GCS."""
+    try:
+        from google.cloud import storage
+
+        client = storage.Client()
+        bucket = client.bucket(GCS_BUCKET)
+
+        # Organize by year-month
+        month_prefix = datetime.now().strftime("%Y-%m")
+
+        uploaded = 0
+
+        # Upload Excel report
+        if os.path.exists(excel_path):
+            blob_name = f"{month_prefix}/{os.path.basename(excel_path)}"
+            blob = bucket.blob(blob_name)
+            blob.upload_from_filename(excel_path)
+            uploaded += 1
+            print(f"[GCS] Uploaded: {blob_name}")
+
+        # Upload per-site JSON and CSV from assets/
+        if os.path.exists(assets_dir):
+            for site_folder in os.listdir(assets_dir):
+                site_path = os.path.join(assets_dir, site_folder)
+                if not os.path.isdir(site_path):
+                    continue
+                for filename in os.listdir(site_path):
+                    if filename.endswith((".json", ".csv", ".txt")):
+                        local_path = os.path.join(site_path, filename)
+                        blob_name = f"{month_prefix}/sites/{site_folder}/{filename}"
+                        blob = bucket.blob(blob_name)
+                        blob.upload_from_filename(local_path)
+                        uploaded += 1
+
+        print(f"[GCS] Upload complete: {uploaded} files → gs://{GCS_BUCKET}/{month_prefix}/")
+
+    except ImportError:
+        print("[GCS] google-cloud-storage not installed, skipping upload")
+    except Exception as e:
+        print(f"[GCS] Upload error: {e}")
+
+
+# ---------------------------------------------------------------------------
 # VM shutdown
 # ---------------------------------------------------------------------------
 
@@ -750,11 +800,14 @@ def main():
     print(f"Results: {successful} succeeded, {failed} failed")
 
     if crawl_ok:
+        upload_reports_to_gcs(output_path)
         if not args.no_email:
             pack_and_send_email(output_path)
         if not args.no_shutdown:
             auto_shutdown_vm(args.vm_name)
     else:
+        # 即使失敗也上傳已有的報告，方便除錯
+        upload_reports_to_gcs(output_path)
         print(
             "Errors occurred during execution — "
             "skipping email/shutdown to allow debugging"
