@@ -108,17 +108,31 @@ fi
 echo "[$(date '+%H:%M:%S')] 載入 .env（Secret Manager）..." >> "${LOG_FILE}"
 ENV_FILE="${PROJECT_DIR}/.env"
 
-if gcloud secrets versions access latest --secret="${SECRET_NAME}" --project="${GCP_PROJECT}" > "${ENV_FILE}" 2>> "${LOG_FILE}"; then
-    chown "${PROJECT_USER}:${PROJECT_USER}" "${ENV_FILE}"
-    chmod 600 "${ENV_FILE}"
-    echo "[$(date '+%H:%M:%S')] .env 載入成功" >> "${LOG_FILE}"
-else
-    echo "[$(date '+%H:%M:%S')] Secret Manager 載入失敗，檢查是否有本地 .env" >> "${LOG_FILE}"
-    if [ -f "${ENV_FILE}" ]; then
-        echo "[$(date '+%H:%M:%S')] 使用本地現有 .env" >> "${LOG_FILE}"
+# 使用 metadata token + REST API（避免 gcloud CLI token cache 問題）
+SECRET_URL="https://secretmanager.googleapis.com/v1/projects/${GCP_PROJECT}/secrets/${SECRET_NAME}/versions/latest:access"
+TOKEN=$(curl -s -H "Metadata-Flavor: Google" \
+    "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token" \
+    | python3 -c "import sys,json;print(json.load(sys.stdin)['access_token'])" 2>/dev/null)
+
+if [ -n "$TOKEN" ]; then
+    SECRET_DATA=$(curl -s -H "Authorization: Bearer ${TOKEN}" "${SECRET_URL}" \
+        | python3 -c "import sys,json,base64;d=json.load(sys.stdin);print(base64.b64decode(d['payload']['data']).decode())" 2>/dev/null)
+
+    if [ -n "$SECRET_DATA" ]; then
+        echo "$SECRET_DATA" > "${ENV_FILE}"
+        chown "${PROJECT_USER}:${PROJECT_USER}" "${ENV_FILE}"
+        chmod 600 "${ENV_FILE}"
+        echo "[$(date '+%H:%M:%S')] .env 載入成功（Secret Manager）" >> "${LOG_FILE}"
     else
-        echo "[$(date '+%H:%M:%S')] 警告：無 .env 檔案，Email 功能可能無法使用" >> "${LOG_FILE}"
+        echo "[$(date '+%H:%M:%S')] Secret Manager 回應為空" >> "${LOG_FILE}"
     fi
+else
+    echo "[$(date '+%H:%M:%S')] 無法取得 metadata token" >> "${LOG_FILE}"
+fi
+
+# Fallback: 如果 Secret Manager 失敗，檢查本地 .env
+if [ ! -f "${ENV_FILE}" ]; then
+    echo "[$(date '+%H:%M:%S')] 警告：無 .env 檔案，Email 功能可能無法使用" >> "${LOG_FILE}"
 fi
 
 # =============================================================================
