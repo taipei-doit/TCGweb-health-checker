@@ -50,6 +50,8 @@ if [ ! -f "/home/${PROJECT_USER}/.crawler_env_installed" ]; then
         echo "[$(date '+%H:%M:%S')] 建立使用者 ${PROJECT_USER}..." >> "${LOG_FILE}"
         useradd -m -s /bin/bash "${PROJECT_USER}"
     fi
+    # 確保 home 目錄權限正確
+    chown -R "${PROJECT_USER}:${PROJECT_USER}" "/home/${PROJECT_USER}"
 
     # --- 複製專案程式碼（僅首次）---
     if [ ! -d "${PROJECT_DIR}" ]; then
@@ -62,7 +64,7 @@ if [ ! -f "/home/${PROJECT_USER}/.crawler_env_installed" ]; then
     echo "[$(date '+%H:%M:%S')] 安裝 Python 依賴..." >> "${LOG_FILE}"
     pip3 install -r requirements.txt google-cloud-firestore google-cloud-storage >> "${LOG_FILE}" 2>&1
 
-    # --- 安裝 Playwright ---
+    # --- 安裝 Playwright（用 crawler 使用者，確保 cache 在正確位置）---
     echo "[$(date '+%H:%M:%S')] 安裝 Playwright Chromium..." >> "${LOG_FILE}"
 
     # 安裝 Playwright 系統依賴
@@ -73,7 +75,7 @@ if [ ! -f "/home/${PROJECT_USER}/.crawler_env_installed" ]; then
         libnss3 libnspr4 libdrm2 libxss1 libxshmfence1 \
         libxkbcommon-x11-0 fonts-liberation xdg-utils >> "${LOG_FILE}" 2>&1
 
-    python3 -m playwright install chromium >> "${LOG_FILE}" 2>&1
+    sudo -u "${PROJECT_USER}" python3 -m playwright install chromium >> "${LOG_FILE}" 2>&1
 
     # --- 設定權限 ---
     chown -R "${PROJECT_USER}:${PROJECT_USER}" "${PROJECT_DIR}"
