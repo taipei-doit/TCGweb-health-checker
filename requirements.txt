@@ -1,0 +1,9 @@
+requests
+beautifulsoup4
+pandas
+openpyxl
+google-generativeai
+python-dotenv
+playwright
+httpx
+psutil

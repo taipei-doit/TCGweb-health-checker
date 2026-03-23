@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>網站健康檢查 - 管理平台</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Microsoft JhengHei", sans-serif;
+            background: #f0f2f5;
+            color: #333;
+            line-height: 1.6;
+        }
+        .header {
+            background: linear-gradient(135deg, #1a73e8, #0d47a1);
+            color: white;
+            padding: 24px 32px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+        .header h1 { font-size: 24px; font-weight: 600; }
+        .header p { opacity: 0.85; font-size: 14px; margin-top: 4px; }
+
+        .container { max-width: 1200px; margin: 0 auto; padding: 24px; }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 0;
+            margin-bottom: 24px;
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+        }
+        .tab {
+            flex: 1;
+            padding: 14px 24px;
+            text-align: center;
+            cursor: pointer;
+            font-size: 15px;
+            font-weight: 500;
+            color: #666;
+            border-bottom: 3px solid transparent;
+            transition: all 0.2s;
+        }
+        .tab:hover { background: #f8f9fa; }
+        .tab.active { color: #1a73e8; border-bottom-color: #1a73e8; background: #e8f0fe; }
+
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        /* Cards */
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+        }
+        .card h2 {
+            font-size: 18px;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .badge {
+            background: #e8f0fe;
+            color: #1a73e8;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        /* Forms */
+        .form-row {
+            display: flex;
+            gap: 12px;
+            align-items: flex-end;
+            flex-wrap: wrap;
+        }
+        .form-group { display: flex; flex-direction: column; gap: 4px; }
+        .form-group label { font-size: 13px; color: #666; font-weight: 500; }
+        .form-group input, .form-group select {
+            padding: 10px 14px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .form-group input:focus, .form-group select:focus { border-color: #1a73e8; }
+        .form-group.wide { flex: 1; min-width: 200px; }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+        .btn-primary { background: #1a73e8; color: white; }
+        .btn-primary:hover { background: #1557b0; }
+        .btn-danger { background: #dc3545; color: white; }
+        .btn-danger:hover { background: #b02a37; }
+        .btn-outline {
+            background: white;
+            color: #1a73e8;
+            border: 1px solid #1a73e8;
+        }
+        .btn-outline:hover { background: #e8f0fe; }
+        .btn-success { background: #28a745; color: white; }
+        .btn-success:hover { background: #218838; }
+        .btn-warning { background: #ffc107; color: #333; }
+        .btn-warning:hover { background: #e0a800; }
+        .btn-sm { padding: 6px 12px; font-size: 13px; }
+        .btn-lg { padding: 16px 32px; font-size: 18px; border-radius: 12px; }
+
+        /* VM Status */
+        .vm-panel { text-align: center; padding: 40px 20px; }
+        .vm-status-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 24px;
+            border-radius: 24px;
+            font-size: 16px;
+            font-weight: 600;
+            margin: 16px 0;
+        }
+        .vm-status-indicator.running { background: #d4edda; color: #155724; }
+        .vm-status-indicator.stopped { background: #f8d7da; color: #721c24; }
+        .vm-status-indicator.loading { background: #fff3cd; color: #856404; }
+        .vm-status-indicator .dot {
+            width: 12px; height: 12px; border-radius: 50%;
+        }
+        .vm-status-indicator.running .dot { background: #28a745; animation: pulse 1.5s infinite; }
+        .vm-status-indicator.stopped .dot { background: #dc3545; }
+        .vm-status-indicator.loading .dot { background: #ffc107; animation: pulse 0.8s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+        .vm-info { color: #666; font-size: 14px; margin: 8px 0; }
+        .vm-actions { margin-top: 24px; display: flex; gap: 16px; justify-content: center; }
+
+        /* Tables */
+        .table-wrap { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; }
+        th {
+            background: #f8f9fa;
+            padding: 12px 16px;
+            text-align: left;
+            font-size: 13px;
+            color: #666;
+            font-weight: 600;
+            border-bottom: 2px solid #e9ecef;
+        }
+        td {
+            padding: 12px 16px;
+            border-bottom: 1px solid #f0f0f0;
+            font-size: 14px;
+        }
+        tr:hover { background: #f8f9fa; }
+        .url-cell {
+            max-width: 350px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .url-cell a { color: #1a73e8; text-decoration: none; }
+        .url-cell a:hover { text-decoration: underline; }
+
+        /* Toast */
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .toast {
+            padding: 14px 20px;
+            border-radius: 8px;
+            color: white;
+            font-size: 14px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            animation: slideIn 0.3s ease;
+            min-width: 280px;
+        }
+        .toast.success { background: #28a745; }
+        .toast.error { background: #dc3545; }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+        /* File upload area */
+        .upload-area {
+            border: 2px dashed #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            color: #999;
+            margin-top: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .upload-area:hover { border-color: #1a73e8; color: #1a73e8; }
+        .upload-area input[type="file"] { display: none; }
+
+        .toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        .toolbar-actions { display: flex; gap: 8px; }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+        .empty-state .icon { font-size: 48px; margin-bottom: 12px; }
+
+        .search-box {
+            padding: 10px 14px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            width: 280px;
+            outline: none;
+        }
+        .search-box:focus { border-color: #1a73e8; }
+
+        @media (max-width: 768px) {
+            .container { padding: 12px; }
+            .form-row { flex-direction: column; }
+            .form-group.wide { min-width: unset; }
+            .search-box { width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>TCGweb 網站健康檢查 - 管理平台</h1>
+        <p>管理 Email 收件人名單與受檢網站清單</p>
+    </div>
+
+    <div class="container">
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab('recipients')">Email 收件人</div>
+            <div class="tab" onclick="switchTab('websites')">網站清單</div>
+            <div class="tab" onclick="switchTab('crawler')">爬蟲控制</div>
+        </div>
+
+        <!-- ==================== Email 收件人 Tab ==================== -->
+        <div id="tab-recipients" class="tab-content active">
+            <div class="card">
+                <h2>新增收件人</h2>
+                <div class="form-row">
+                    <div class="form-group wide">
+                        <label>Email</label>
+                        <input type="email" id="r-email" placeholder="example@gov.taipei">
+                    </div>
+                    <div class="form-group wide">
+                        <label>姓名</label>
+                        <input type="text" id="r-name" placeholder="王小明">
+                    </div>
+                    <button class="btn btn-primary" onclick="addRecipient()">新增</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="toolbar">
+                    <h2>收件人名單 <span class="badge" id="r-count">0</span></h2>
+                </div>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>姓名</th>
+                                <th>Email</th>
+                                <th>新增日期</th>
+                                <th style="width:80px">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="r-table-body">
+                            <tr><td colspan="4" class="empty-state"><div class="icon">📧</div>尚無收件人</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== 網站清單 Tab ==================== -->
+        <div id="tab-websites" class="tab-content">
+            <div class="card">
+                <h2>新增網站</h2>
+                <div class="form-row">
+                    <div class="form-group wide">
+                        <label>URL</label>
+                        <input type="url" id="w-url" placeholder="https://example.gov.taipei/">
+                    </div>
+                    <div class="form-group wide">
+                        <label>網站名稱</label>
+                        <input type="text" id="w-name" placeholder="範例網站">
+                    </div>
+                    <div class="form-group">
+                        <label>深度</label>
+                        <input type="number" id="w-depth" placeholder="預設" style="width:80px" min="1" max="5">
+                    </div>
+                    <div class="form-group">
+                        <label>存HTML</label>
+                        <select id="w-save-html" style="width:90px">
+                            <option value="">預設</option>
+                            <option value="true">是</option>
+                            <option value="false">否</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>分頁</label>
+                        <select id="w-pagination" style="width:90px">
+                            <option value="">預設</option>
+                            <option value="true">是</option>
+                            <option value="false">否</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-primary" onclick="addWebsite()">新增</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="toolbar">
+                    <h2>網站清單 <span class="badge" id="w-count">0</span></h2>
+                    <div class="toolbar-actions">
+                        <input type="text" class="search-box" id="w-search" placeholder="搜尋網站名稱或 URL..." oninput="filterWebsites()">
+                        <button class="btn btn-outline btn-sm" onclick="document.getElementById('csv-upload').click()">匯入 CSV</button>
+                        <button class="btn btn-outline btn-sm" onclick="exportCSV()">匯出 CSV</button>
+                    </div>
+                </div>
+                <input type="file" id="csv-upload" accept=".csv" style="display:none" onchange="importCSV(this)">
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>網站名稱</th>
+                                <th>URL</th>
+                                <th>深度</th>
+                                <th>存HTML</th>
+                                <th>分頁</th>
+                                <th>新增日期</th>
+                                <th style="width:80px">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="w-table-body">
+                            <tr><td colspan="7" class="empty-state"><div class="icon">🌐</div>尚無網站</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+        <!-- ==================== 爬蟲控制 Tab ==================== -->
+        <div id="tab-crawler" class="tab-content">
+            <div class="card">
+                <div class="vm-panel">
+                    <h2>爬蟲 VM 控制面板</h2>
+                    <div class="vm-info" id="vm-machine">機型: 載入中...</div>
+                    <div id="vm-status-display">
+                        <div class="vm-status-indicator loading">
+                            <span class="dot"></span> 載入中...
+                        </div>
+                    </div>
+                    <div class="vm-info" id="vm-name-display">VM: -</div>
+                    <div class="vm-actions">
+                        <button class="btn btn-success btn-lg" id="btn-start-vm" onclick="startVM()" disabled>
+                            啟動爬蟲
+                        </button>
+                        <button class="btn btn-danger btn-lg" id="btn-stop-vm" onclick="stopVM()" disabled>
+                            停止 VM
+                        </button>
+                    </div>
+                    <div class="vm-info" style="margin-top: 24px; font-size: 13px; color: #999;">
+                        啟動後，VM 會自動執行爬蟲程式。完成後會自動關機並寄送報告。
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>執行紀錄</h2>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>事件</th>
+                                <th>VM</th>
+                                <th>觸發來源</th>
+                                <th>時間</th>
+                            </tr>
+                        </thead>
+                        <tbody id="events-table-body">
+                            <tr><td colspan="4" class="empty-state">載入中...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast-container" id="toast-container"></div>
+
+    <script>
+    // ========== Toast ==========
+    function showToast(msg, type = 'success') {
+        const c = document.getElementById('toast-container');
+        const t = document.createElement('div');
+        t.className = `toast ${type}`;
+        t.textContent = msg;
+        c.appendChild(t);
+        setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, 3000);
+    }
+
+    // ========== Tabs ==========
+    function switchTab(tab) {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+        document.querySelector(`.tab-content#tab-${tab}`).classList.add('active');
+        event.target.classList.add('active');
+    }
+
+    // ========== Recipients ==========
+    let allRecipients = [];
+
+    async function loadRecipients() {
+        try {
+            const res = await fetch('/api/recipients');
+            const json = await res.json();
+            if (json.success) {
+                allRecipients = json.data;
+                renderRecipients();
+            }
+        } catch(e) { showToast('載入收件人失敗: ' + e.message, 'error'); }
+    }
+
+    function renderRecipients() {
+        const tbody = document.getElementById('r-table-body');
+        document.getElementById('r-count').textContent = allRecipients.length;
+        if (allRecipients.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" class="empty-state"><div class="icon">📧</div>尚無收件人</td></tr>';
+            return;
+        }
+        tbody.innerHTML = allRecipients.map(r => `
+            <tr>
+                <td>${esc(r.name)}</td>
+                <td>${esc(r.email)}</td>
+                <td>${r.created_at || '-'}</td>
+                <td><button class="btn btn-danger btn-sm" onclick="deleteRecipient('${r.id}')">刪除</button></td>
+            </tr>
+        `).join('');
+    }
+
+    async function addRecipient() {
+        const email = document.getElementById('r-email').value.trim();
+        const name = document.getElementById('r-name').value.trim();
+        if (!email) { showToast('請輸入 Email', 'error'); return; }
+        try {
+            const res = await fetch('/api/recipients', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({email, name})
+            });
+            const json = await res.json();
+            if (json.success) {
+                showToast(`已新增 ${email}`);
+                document.getElementById('r-email').value = '';
+                document.getElementById('r-name').value = '';
+                loadRecipients();
+            } else { showToast(json.error, 'error'); }
+        } catch(e) { showToast('新增失敗: ' + e.message, 'error'); }
+    }
+
+    async function deleteRecipient(id) {
+        if (!confirm('確定要刪除此收件人？')) return;
+        try {
+            const res = await fetch(`/api/recipients/${id}`, {method: 'DELETE'});
+            const json = await res.json();
+            if (json.success) { showToast('已刪除'); loadRecipients(); }
+            else { showToast(json.error, 'error'); }
+        } catch(e) { showToast('刪除失敗: ' + e.message, 'error'); }
+    }
+
+    // ========== Websites ==========
+    let allWebsites = [];
+
+    async function loadWebsites() {
+        try {
+            const res = await fetch('/api/websites');
+            const json = await res.json();
+            if (json.success) {
+                allWebsites = json.data;
+                renderWebsites(allWebsites);
+            }
+        } catch(e) { showToast('載入網站清單失敗: ' + e.message, 'error'); }
+    }
+
+    function renderWebsites(list) {
+        const tbody = document.getElementById('w-table-body');
+        document.getElementById('w-count').textContent = allWebsites.length;
+        if (list.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" class="empty-state"><div class="icon">🌐</div>尚無網站</td></tr>';
+            return;
+        }
+        tbody.innerHTML = list.map(w => `
+            <tr>
+                <td>${esc(w.name)}</td>
+                <td class="url-cell"><a href="${esc(w.url)}" target="_blank">${esc(w.url)}</a></td>
+                <td>${w.depth || '預設'}</td>
+                <td>${w.save_html || '預設'}</td>
+                <td>${w.pagination || '預設'}</td>
+                <td>${w.created_at || '-'}</td>
+                <td><button class="btn btn-danger btn-sm" onclick="deleteWebsite('${w.id}')">刪除</button></td>
+            </tr>
+        `).join('');
+    }
+
+    function filterWebsites() {
+        const q = document.getElementById('w-search').value.toLowerCase();
+        const filtered = allWebsites.filter(w =>
+            (w.name || '').toLowerCase().includes(q) || (w.url || '').toLowerCase().includes(q)
+        );
+        renderWebsites(filtered);
+    }
+
+    async function addWebsite() {
+        const url = document.getElementById('w-url').value.trim();
+        const name = document.getElementById('w-name').value.trim();
+        const depth = document.getElementById('w-depth').value;
+        const save_html = document.getElementById('w-save-html').value;
+        const pagination = document.getElementById('w-pagination').value;
+        if (!url) { showToast('請輸入 URL', 'error'); return; }
+        try {
+            const res = await fetch('/api/websites', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({url, name, depth, save_html, pagination})
+            });
+            const json = await res.json();
+            if (json.success) {
+                showToast(`已新增 ${name || url}`);
+                document.getElementById('w-url').value = '';
+                document.getElementById('w-name').value = '';
+                document.getElementById('w-depth').value = '';
+                document.getElementById('w-save-html').value = '';
+                document.getElementById('w-pagination').value = '';
+                loadWebsites();
+            } else { showToast(json.error, 'error'); }
+        } catch(e) { showToast('新增失敗: ' + e.message, 'error'); }
+    }
+
+    async function deleteWebsite(id) {
+        if (!confirm('確定要刪除此網站？')) return;
+        try {
+            const res = await fetch(`/api/websites/${id}`, {method: 'DELETE'});
+            const json = await res.json();
+            if (json.success) { showToast('已刪除'); loadWebsites(); }
+            else { showToast(json.error, 'error'); }
+        } catch(e) { showToast('刪除失敗: ' + e.message, 'error'); }
+    }
+
+    async function importCSV(input) {
+        if (!input.files.length) return;
+        const formData = new FormData();
+        formData.append('file', input.files[0]);
+        try {
+            const res = await fetch('/api/websites/import-csv', {method: 'POST', body: formData});
+            const json = await res.json();
+            if (json.success) { showToast(json.message); loadWebsites(); }
+            else { showToast(json.error, 'error'); }
+        } catch(e) { showToast('匯入失敗: ' + e.message, 'error'); }
+        input.value = '';
+    }
+
+    function exportCSV() {
+        window.location.href = '/api/websites/export-csv';
+    }
+
+    // ========== VM Control ==========
+    let vmRefreshTimer = null;
+
+    async function loadVMStatus() {
+        try {
+            const res = await fetch('/api/vm/status');
+            const json = await res.json();
+            const display = document.getElementById('vm-status-display');
+            const btnStart = document.getElementById('btn-start-vm');
+            const btnStop = document.getElementById('btn-stop-vm');
+
+            if (!json.success) {
+                display.innerHTML = `<div class="vm-status-indicator loading"><span class="dot"></span> 無法取得狀態</div>`;
+                document.getElementById('vm-name-display').textContent = json.error || '連線失敗';
+                btnStart.disabled = true;
+                btnStop.disabled = true;
+                return;
+            }
+
+            const vm = json.data;
+            const isRunning = vm.status === 'RUNNING';
+            const isStopped = vm.status === 'TERMINATED' || vm.status === 'STOPPED';
+
+            display.innerHTML = `
+                <div class="vm-status-indicator ${isRunning ? 'running' : 'stopped'}">
+                    <span class="dot"></span> ${isRunning ? '執行中' : '已停止'} (${vm.status})
+                </div>
+            `;
+            document.getElementById('vm-name-display').textContent = `VM: ${vm.name} (${vm.zone})`;
+            document.getElementById('vm-machine').textContent = `機型: ${vm.machine_type}`;
+
+            btnStart.disabled = isRunning;
+            btnStop.disabled = !isRunning;
+        } catch(e) {
+            document.getElementById('vm-status-display').innerHTML =
+                `<div class="vm-status-indicator loading"><span class="dot"></span> 連線錯誤</div>`;
+        }
+    }
+
+    async function startVM() {
+        if (!confirm('確定要啟動爬蟲 VM？\n\nVM 啟動後會自動執行網站健康檢查，完成後自動關機。')) return;
+        const btn = document.getElementById('btn-start-vm');
+        btn.disabled = true;
+        btn.textContent = '啟動中...';
+        try {
+            const res = await fetch('/api/vm/start', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}'});
+            const json = await res.json();
+            if (json.success) {
+                showToast(json.message);
+                loadVMStatus();
+                loadEvents();
+            } else { showToast(json.error, 'error'); }
+        } catch(e) { showToast('啟動失敗: ' + e.message, 'error'); }
+        btn.textContent = '啟動爬蟲';
+        setTimeout(loadVMStatus, 3000);
+    }
+
+    async function stopVM() {
+        if (!confirm('確定要停止爬蟲 VM？\n\n如果爬蟲正在執行中，強制停止可能導致資料不完整。')) return;
+        const btn = document.getElementById('btn-stop-vm');
+        btn.disabled = true;
+        btn.textContent = '停止中...';
+        try {
+            const res = await fetch('/api/vm/stop', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}'});
+            const json = await res.json();
+            if (json.success) { showToast(json.message); loadVMStatus(); loadEvents(); }
+            else { showToast(json.error, 'error'); }
+        } catch(e) { showToast('停止失敗: ' + e.message, 'error'); }
+        btn.textContent = '停止 VM';
+        setTimeout(loadVMStatus, 3000);
+    }
+
+    async function loadEvents() {
+        try {
+            const res = await fetch('/api/vm/events');
+            const json = await res.json();
+            const tbody = document.getElementById('events-table-body');
+            if (!json.success || !json.data.length) {
+                tbody.innerHTML = '<tr><td colspan="4" class="empty-state">尚無執行紀錄</td></tr>';
+                return;
+            }
+            tbody.innerHTML = json.data.map(e => `
+                <tr>
+                    <td>${e.event === 'vm_started' ? '啟動' : e.event === 'vm_stopped' ? '停止' : e.event}</td>
+                    <td>${esc(e.vm_name || '-')}</td>
+                    <td>${esc(e.triggered_by || '-')}</td>
+                    <td>${e.timestamp || '-'}</td>
+                </tr>
+            `).join('');
+        } catch(e) {
+            document.getElementById('events-table-body').innerHTML =
+                '<tr><td colspan="4" class="empty-state">載入失敗</td></tr>';
+        }
+    }
+
+    // ========== Utils ==========
+    function esc(s) {
+        if (!s) return '';
+        const d = document.createElement('div');
+        d.textContent = s;
+        return d.innerHTML;
+    }
+
+    // ========== Init ==========
+    loadRecipients();
+    loadWebsites();
+    loadVMStatus();
+    loadEvents();
+    </script>
+</body>
+</html>

@@ -1,0 +1,21 @@
+# 機敏資料
+.env
+*.env.local
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# 爬蟲產出
+assets/
+output/
+*.xlsx
+*.log
+*.pid
+
+# 本地備份
+*.bak
+.claude/
