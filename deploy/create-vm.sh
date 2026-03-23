@@ -91,7 +91,7 @@ if [ $? -eq 0 ]; then
     echo "  gcloud compute ssh ${VM_NAME} --zone=${ZONE} --project=${PROJECT_ID}"
     echo ""
     echo "查看啟動日誌："
-    echo "  gcloud compute ssh ${VM_NAME} --zone=${ZONE} --project=${PROJECT_ID} --command='tail -f /home/hyc9977/vm_startup.log'"
+    echo "  gcloud compute ssh ${VM_NAME} --zone=${ZONE} --project=${PROJECT_ID} --command='tail -f /home/crawler/vm_startup.log'"
     echo "============================================"
 else
     echo "錯誤：VM 建立失敗，請檢查錯誤訊息"

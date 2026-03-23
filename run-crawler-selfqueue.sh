@@ -6,7 +6,7 @@
 set -e
 
 # --- 設定變數 ---
-PROJECT_USER="hyc9977"
+PROJECT_USER="crawler"
 PROJECT_DIR="/home/$PROJECT_USER/TCGweb-health-checker"
 PYTHON_CMD="python3 -u"
 PYTHON_SCRIPT="gcp_main_mpselfqueue.py"  # 使用 multiprocessing 版本

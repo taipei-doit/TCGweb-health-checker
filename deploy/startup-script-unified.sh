@@ -12,7 +12,7 @@
 set -e
 
 # --- 設定變數 ---
-PROJECT_USER="hyc9977"
+PROJECT_USER="crawler"
 PROJECT_DIR="/home/${PROJECT_USER}/TCGweb-health-checker"
 REPO_URL="https://github.com/jchilling/TCGweb-health-checker"
 LOG_FILE="/home/${PROJECT_USER}/vm_startup.log"
