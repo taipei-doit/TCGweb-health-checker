@@ -93,15 +93,19 @@ fi
 # =============================================================================
 echo "[$(date '+%H:%M:%S')] 檢查 Git 是否有新版本..." >> "${LOG_FILE}"
 cd "${PROJECT_DIR}"
-sudo -u "${PROJECT_USER}" git fetch origin main >> "${LOG_FILE}" 2>&1 || true
-LOCAL=$(sudo -u "${PROJECT_USER}" git rev-parse HEAD 2>/dev/null)
-REMOTE=$(sudo -u "${PROJECT_USER}" git rev-parse origin/main 2>/dev/null)
-if [ "$LOCAL" != "$REMOTE" ]; then
-    echo "[$(date '+%H:%M:%S')] 發現新版本，更新中..." >> "${LOG_FILE}"
-    sudo -u "${PROJECT_USER}" git reset --hard origin/main >> "${LOG_FILE}" 2>&1
-    echo "[$(date '+%H:%M:%S')] 已更新至: $(sudo -u ${PROJECT_USER} git log --oneline -1)" >> "${LOG_FILE}"
+if sudo -u "${PROJECT_USER}" git fetch origin main >> "${LOG_FILE}" 2>&1; then
+    LOCAL=$(sudo -u "${PROJECT_USER}" git rev-parse HEAD 2>/dev/null)
+    REMOTE=$(sudo -u "${PROJECT_USER}" git rev-parse origin/main 2>/dev/null)
+    if [ "$LOCAL" != "$REMOTE" ]; then
+        echo "[$(date '+%H:%M:%S')] 發現新版本，更新中..." >> "${LOG_FILE}"
+        sudo -u "${PROJECT_USER}" git reset --hard origin/main >> "${LOG_FILE}" 2>&1
+        echo "[$(date '+%H:%M:%S')] [GIT] 已更新至: $(sudo -u ${PROJECT_USER} git log --oneline -1)" >> "${LOG_FILE}"
+    else
+        echo "[$(date '+%H:%M:%S')] [GIT] 已是最新版本: $(sudo -u ${PROJECT_USER} git log --oneline -1)" >> "${LOG_FILE}"
+    fi
 else
-    echo "[$(date '+%H:%M:%S')] 已是最新版本" >> "${LOG_FILE}"
+    echo "[$(date '+%H:%M:%S')] [GIT] GitHub 連線失敗，使用本地現有版本" >> "${LOG_FILE}"
+    echo "[$(date '+%H:%M:%S')] [GIT] 本地版本: $(sudo -u ${PROJECT_USER} git log --oneline -1)" >> "${LOG_FILE}"
 fi
 
 # =============================================================================
