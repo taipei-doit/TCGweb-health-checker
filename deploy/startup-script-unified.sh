@@ -14,7 +14,7 @@ set -e
 # --- 設定變數 ---
 PROJECT_USER="crawler"
 PROJECT_DIR="/home/${PROJECT_USER}/TCGweb-health-checker"
-REPO_URL="https://github.com/tpe-doit/TCGweb-health-checker"
+REPO_URL="https://github.com/taipei-doit/TCGweb-health-checker"
 LOG_FILE="/home/${PROJECT_USER}/vm_startup.log"
 CRAWLER_LOG="/home/${PROJECT_USER}/crawler_execution.log"
 PYTHON_CMD="python3 -u"
